@@ -37,7 +37,8 @@ Dans Supabase > SQL Editor, exécuter dans l'ordre :
 6. `supabase/concierge.sql` : colonne `tenant` sur les tickets + droits des concierges
    (lire/créer/modifier les tickets de leurs logements, lire leurs immeubles, logements, locataires, propriétaires).
 7. `supabase/tickets_tenant.sql` : le locataire d'un ticket est forcé à celui du logement.
-8. `supabase/migration_fk.sql` : optionnel, ajoute les clés étrangères.
+8. `supabase/comments.sql` : droits sur les commentaires des tickets (table `comments`).
+9. `supabase/migration_fk.sql` : optionnel, ajoute les clés étrangères.
 
 Puis déployer l'Edge Function qui crée les comptes (page Utilisateurs) :
 
@@ -63,6 +64,8 @@ Page **Utilisateurs** (admin) : admins et concierges. Les comptes sont créés d
 - `owner` = id de l'utilisateur qui a créé le ticket (rempli automatiquement).
 - `tenant` = locataire du logement, rempli automatiquement (non modifiable).
 - Valeurs et catégories : `src/lib/tickets.js`.
+- Commentaires (`comments`) : fil de suivi dans chaque ticket. `ticket` = id du ticket, `by` = id de l'auteur
+  (rempli automatiquement). Chacun peut supprimer ses propres commentaires (`is_deleted`).
 
 ## Ajouter un champ ou une table
 

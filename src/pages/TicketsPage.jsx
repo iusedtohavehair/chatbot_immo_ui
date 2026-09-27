@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { myScope } from '@/lib/scope'
 import { CATEGORIES, PRIORITIES, RESOLVED, STATES, findOption } from '@/lib/tickets'
+import TicketComments from '@/components/TicketComments'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -286,7 +287,7 @@ function TicketDialog({ ticket, data, onClose, onSaved }) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isNew ? 'Nouveau ticket' : `Ticket #${ticket.id}`}</DialogTitle>
         </DialogHeader>
@@ -364,6 +365,8 @@ function TicketDialog({ ticket, data, onClose, onSaved }) {
               onChange={(e) => set('text', e.target.value)}
             />
           </div>
+
+          {!isNew && <TicketComments ticketId={ticket.id} />}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
