@@ -3,6 +3,7 @@ import { Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
+import { myScope } from '@/lib/scope'
 import { CATEGORIES, PRIORITIES, RESOLVED, STATES, findOption } from '@/lib/tickets'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -28,11 +29,24 @@ export default function TicketsPage() {
   const [editing, setEditing] = useState(null)
 
   const load = useCallback(async () => {
+    let scope
+    try {
+      scope = await myScope(['buildings', 'doors', 'tenants'])
+    } catch (error) {
+      toast.error(error.message)
+      setLoading(false)
+      return
+    }
     const [tickets, doors, buildings, tenants] = await Promise.all([
-      supabase.from('tickets').select('*').eq('is_deleted', false).order('created_at', { ascending: false }),
-      supabase.from('doors').select('id, name, building, tenants').order('name'),
-      supabase.from('buildings').select('id, name').order('name'),
-      supabase.from('tenants').select('id, name, phone').order('name'),
+      supabase
+        .from('tickets')
+        .select('*')
+        .eq('is_deleted', false)
+        .in('door', scope.doors)
+        .order('created_at', { ascending: false }),
+      supabase.from('doors').select('id, name, building, tenants').in('id', scope.doors).order('name'),
+      supabase.from('buildings').select('id, name').in('id', scope.buildings).order('name'),
+      supabase.from('tenants').select('id, name, phone').in('id', scope.tenants).order('name'),
     ])
     const error = tickets.error || doors.error || buildings.error || tenants.error
     if (error) toast.error(error.message)
@@ -75,7 +89,7 @@ export default function TicketsPage() {
       if (stateFilter === OPEN && Number(ticket.state) === RESOLVED) return false
       if (stateFilter !== OPEN && stateFilter !== ALL && String(ticket.state) !== stateFilter) return false
       if (!q) return true
-      return [`#${ticket.id}`, ticket.summary, ticket.text, ticket.category, door?.name, building?.name, tenant?.name]
+      return [`#${ticket.id}`, ticket.title, ticket.summary, ticket.text, ticket.category, door?.name, building?.name, tenant?.name]
         .some((v) => v && String(v).toLowerCase().includes(q))
     })
   }, [rows, search, buildingFilter, stateFilter])
@@ -142,7 +156,7 @@ export default function TicketsPage() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-14">#</TableHead>
-              <TableHead>Sommaire</TableHead>
+              <TableHead>Titre</TableHead>
               <TableHead>Immeuble</TableHead>
               <TableHead>Porte</TableHead>
               <TableHead>Locataire</TableHead>
@@ -159,7 +173,7 @@ export default function TicketsPage() {
                 onClick={() => setEditing({ ...ticket, building: door ? String(door.building) : '' })}
               >
                 <TableCell className="text-muted-foreground">{ticket.id}</TableCell>
-                <TableCell className="max-w-72 truncate font-medium">{ticket.summary || '—'}</TableCell>
+                <TableCell className="max-w-72 truncate font-medium">{ticket.title || ticket.summary || '—'}</TableCell>
                 <TableCell>{building?.name ?? '—'}</TableCell>
                 <TableCell>{door?.name ?? '—'}</TableCell>
                 <TableCell>{tenant?.name ?? '—'}</TableCell>
@@ -211,7 +225,7 @@ function TicketDialog({ ticket, data, onClose, onSaved }) {
   const [form, setForm] = useState(() => ({
     building: ticket.building ?? '',
     door: ticket.door != null ? String(ticket.door) : '',
-    tenant: ticket.tenant != null ? String(ticket.tenant) : '',
+    title: ticket.title ?? '',
     summary: ticket.summary ?? '',
     text: ticket.text ?? '',
     category: ticket.category ?? '',
@@ -223,6 +237,13 @@ function TicketDialog({ ticket, data, onClose, onSaved }) {
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }))
 
   const doorOptions = data.doors.filter((d) => !form.building || String(d.building) === form.building)
+
+  // Le locataire est toujours celui du logement. Un ticket existant garde son locataire
+  // d'origine tant que le logement ne change pas (historique si le locataire déménage).
+  const selectedDoor = data.doors.find((d) => String(d.id) === form.door)
+  const doorChanged = isNew || form.door !== String(ticket.door ?? '')
+  const tenantId = doorChanged ? selectedDoor?.tenants : ticket.tenant
+  const tenant = data.tenants.find((t) => String(t.id) === String(tenantId))
 
   function selectBuilding(building) {
     setForm((f) => {
@@ -237,7 +258,6 @@ function TicketDialog({ ticket, data, onClose, onSaved }) {
       ...f,
       door: doorId,
       building: door ? String(door.building) : f.building,
-      tenant: door?.tenants ? String(door.tenants) : f.tenant,
     }))
   }
 
@@ -247,8 +267,9 @@ function TicketDialog({ ticket, data, onClose, onSaved }) {
     setSaving(true)
     const payload = {
       door: form.door,
-      tenant: form.tenant ? Number(form.tenant) : null,
-      summary: form.summary.trim(),
+      ...(doorChanged && { tenant: tenantId ? Number(tenantId) : null }),
+      title: form.title.trim(),
+      summary: form.summary.trim() || null,
       text: form.text.trim() || null,
       category: form.category || null,
       priority: Number(form.priority),
@@ -271,14 +292,14 @@ function TicketDialog({ ticket, data, onClose, onSaved }) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="summary">Sommaire</Label>
+            <Label htmlFor="title">Titre</Label>
             <Input
-              id="summary"
+              id="title"
               required
               autoFocus={isNew}
               placeholder="Ex. : Fuite sous l'évier"
-              value={form.summary}
-              onChange={(e) => set('summary', e.target.value)}
+              value={form.title}
+              onChange={(e) => set('title', e.target.value)}
             />
           </div>
 
@@ -295,13 +316,12 @@ function TicketDialog({ ticket, data, onClose, onSaved }) {
               onChange={selectDoor}
               options={doorOptions.map((d) => ({ value: String(d.id), label: d.name || `#${d.id}` }))}
             />
-            <SelectField
-              label="Locataire"
-              value={form.tenant}
-              onChange={(v) => set('tenant', v)}
-              allowNone
-              options={data.tenants.map((t) => ({ value: String(t.id), label: t.name || `#${t.id}` }))}
-            />
+            <div className="grid gap-2">
+              <Label>Locataire</Label>
+              <div className="flex h-8 items-center truncate rounded-lg border bg-muted/50 px-2.5 text-sm text-muted-foreground">
+                {tenant?.name ?? (form.door ? 'Aucun locataire' : 'Selon la porte')}
+              </div>
+            </div>
             <SelectField
               label="Catégorie"
               value={form.category}
@@ -320,6 +340,17 @@ function TicketDialog({ ticket, data, onClose, onSaved }) {
               value={form.state}
               onChange={(v) => set('state', v)}
               options={STATES.map((s) => ({ value: String(s.value), label: s.label }))}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="summary">Sommaire</Label>
+            <Textarea
+              id="summary"
+              rows={2}
+              placeholder="Résumé en quelques mots"
+              value={form.summary}
+              onChange={(e) => set('summary', e.target.value)}
             />
           </div>
 

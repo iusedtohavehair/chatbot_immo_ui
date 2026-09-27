@@ -3,6 +3,7 @@ import { Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
+import { myScope } from '@/lib/scope'
 import ChildList from '@/components/ChildList'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -30,9 +31,20 @@ export default function ResourcePage({ resource }) {
 
   const load = useCallback(async () => {
     const refFields = resource.fields.filter((f) => f.ref)
+    let scope = null
+    if (resource.scoped) {
+      try {
+        scope = await myScope([...new Set([resource.table, ...refFields.map((f) => f.ref)])])
+      } catch (error) {
+        toast.error(error.message)
+        setLoading(false)
+        return
+      }
+    }
+    const inScope = (query, table) => (scope ? query.in('id', scope[table]) : query)
     const [main, ...refResults] = await Promise.all([
-      supabase.from(resource.table).select('*').order('created_at', { ascending: false }),
-      ...refFields.map((f) => supabase.from(f.ref).select('id, name, active').order('name')),
+      inScope(supabase.from(resource.table).select('*'), resource.table).order('created_at', { ascending: false }),
+      ...refFields.map((f) => inScope(supabase.from(f.ref).select('id, name, active'), f.ref).order('name')),
     ])
     if (main.error) toast.error(main.error.message)
     setRows(main.data ?? [])

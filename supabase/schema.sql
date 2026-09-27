@@ -47,6 +47,7 @@ create table if not exists public.tickets (
   door text null,
   priority numeric null,
   state numeric null,
+  title text null,
   summary text null,
   text text null,
   category text null,

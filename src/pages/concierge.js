@@ -1,7 +1,7 @@
 import { Building2, DoorOpen, Ticket } from 'lucide-react'
 
 // Pages de consultation de la plateforme concierge (même format que resources.js).
-// Les données sont automatiquement limitées aux immeubles de l'utilisateur (RLS, voir supabase/concierge.sql).
+// `scoped` : limite les données aux immeubles assignés à l'utilisateur (voir lib/scope.js).
 export const conciergeResources = [
   {
     path: 'immeubles',
@@ -9,6 +9,7 @@ export const conciergeResources = [
     label: 'Mes immeubles',
     icon: Building2,
     readOnly: true,
+    scoped: true,
     filter: 'landlord',
     fields: [
       { key: 'name', label: 'Nom' },
@@ -24,6 +25,7 @@ export const conciergeResources = [
     label: 'Mes logements',
     icon: DoorOpen,
     readOnly: true,
+    scoped: true,
     filter: 'building',
     fields: [
       { key: 'name', label: 'Porte' },
