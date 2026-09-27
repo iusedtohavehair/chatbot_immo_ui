@@ -8,7 +8,6 @@ create table if not exists public.users (
   name text null,
   email text null,
   role text not null default 'concierge' check (role in ('admin', 'concierge')),
-  landlord text null,
   active boolean not null default true,
   constraint users_pkey primary key (id)
 );

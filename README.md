@@ -27,7 +27,9 @@ Dans Supabase > SQL Editor, exécuter dans l'ordre :
 2. `supabase/schema.sql` : crée les tables (si elles n'existent pas).
 3. `supabase/users.sql` : table des utilisateurs + rôles. Les comptes Auth existants deviennent admins.
 4. `supabase/policies.sql` : active la sécurité (seuls les admins ont accès aux données).
-5. `supabase/migration_fk.sql` : optionnel, ajoute les clés étrangères.
+5. `supabase/user_buildings.sql` : lie un utilisateur à plusieurs immeubles avec un rôle par immeuble,
+   et permet à chacun de lire les immeubles, logements et tickets de ses immeubles.
+6. `supabase/migration_fk.sql` : optionnel, ajoute les clés étrangères.
 
 Puis déployer l'Edge Function qui crée les comptes (page Utilisateurs) :
 
@@ -39,6 +41,8 @@ Puis déployer l'Edge Function qui crée les comptes (page Utilisateurs) :
 
 Page **Utilisateurs** : admins et concierges. Les nouveaux comptes sont créés depuis l'interface
 (il n'y a pas d'inscription publique). Seuls les comptes avec le rôle `admin` peuvent ouvrir cette interface.
+Dans le formulaire d'un utilisateur, section **Immeubles** : associer autant d'immeubles que voulu,
+chacun avec un rôle (concierge, gestionnaire, propriétaire, technicien).
 Désactiver un admin (switch "Actif") lui retire l'accès à cette interface. Pour les concierges,
 la future plateforme de tickets devra aussi vérifier `active`.
 

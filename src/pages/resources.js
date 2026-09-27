@@ -13,6 +13,7 @@ import { createUser } from '@/lib/users'
 // }
 // `filter` = clé d'un champ `ref` proposé comme filtre en haut de la page.
 // `create` = fonction de création personnalisée (sinon insert direct dans la table).
+// `children` = liens vers une table de jointure, gérés dans le formulaire (voir ChildList).
 export const resources = [
   {
     path: 'proprietaires',
@@ -74,8 +75,26 @@ export const resources = [
     label: 'Utilisateurs',
     singular: 'utilisateur',
     icon: UserCog,
-    filter: 'landlord',
     create: createUser,
+    children: {
+      table: 'user_buildings',
+      foreignKey: 'user_id',
+      label: 'Immeubles',
+      fields: [
+        { key: 'building', label: 'Immeuble', ref: 'buildings' },
+        {
+          key: 'role',
+          label: 'Rôle',
+          default: 'concierge',
+          options: [
+            { value: 'concierge', label: 'Concierge' },
+            { value: 'gestionnaire', label: 'Gestionnaire' },
+            { value: 'proprietaire', label: 'Propriétaire' },
+            { value: 'technicien', label: 'Technicien' },
+          ],
+        },
+      ],
+    },
     fields: [
       { key: 'name', label: 'Nom' },
       { key: 'email', label: 'Courriel', type: 'email', required: true, lockOnEdit: true },
@@ -89,7 +108,6 @@ export const resources = [
           { value: 'admin', label: 'Admin' },
         ],
       },
-      { key: 'landlord', label: 'Propriétaire', ref: 'landlord' },
       { key: 'active', label: 'Actif', type: 'boolean' },
     ],
   },

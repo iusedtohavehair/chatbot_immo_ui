@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import ChildList from '@/components/ChildList'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -144,12 +145,14 @@ export default function ResourcePage({ resource }) {
 
       {editing && (
         <EditDialog
+          key={editing.id ?? 'new'}
           record={editing}
           resource={resource}
           refs={refs}
           onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null)
+          onSaved={(created) => {
+            // Après création, on reste dans le formulaire si des liens (children) restent à ajouter.
+            setEditing(created && resource.children ? created : null)
             load()
           }}
           title={editing.id ? `Modifier : ${editing.name || singular}` : `Ajouter un ${singular}`}
@@ -180,14 +183,14 @@ function EditDialog({ record, resource, refs, onClose, onSaved, title }) {
           return [f.key, f.type === 'password' ? String(v) : String(v).trim()]
         }),
     )
-    let error
+    let data, error
     if (!isNew) ({ error } = await supabase.from(resource.table).update(payload).eq('id', record.id))
-    else if (resource.create) ({ error } = await resource.create(payload))
-    else ({ error } = await supabase.from(resource.table).insert(payload))
+    else if (resource.create) ({ data, error } = await resource.create(payload))
+    else ({ data, error } = await supabase.from(resource.table).insert(payload).select().single())
     setSaving(false)
     if (error) return toast.error(error.message)
     toast.success('Enregistré')
-    onSaved()
+    onSaved(data)
   }
 
   return (
@@ -207,6 +210,14 @@ function EditDialog({ record, resource, refs, onClose, onSaved, title }) {
               onChange={(v) => set(f.key, v)}
             />
           ))}
+          {resource.children &&
+            (isNew ? (
+              <p className="border-t pt-4 text-sm text-muted-foreground">
+                {resource.children.label} : à ajouter après l'enregistrement.
+              </p>
+            ) : (
+              <ChildList config={resource.children} parentId={record.id} />
+            ))}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Annuler

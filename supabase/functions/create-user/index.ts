@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
   const { data: isAdmin } = await caller.rpc('is_admin')
   if (!isAdmin) return json({ error: 'Accès refusé' }, 403)
 
-  const { email, password, name, role, landlord, active } = await req.json()
+  const { email, password, name, role, active } = await req.json()
   if (!email || !password) return json({ error: 'Courriel et mot de passe requis' }, 400)
 
   const admin = createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false } })
@@ -39,7 +39,6 @@ Deno.serve(async (req) => {
     email,
     name: name ?? null,
     role: role ?? 'concierge',
-    landlord: landlord ?? null,
     active: active ?? true,
   })
   if (insertError) {
