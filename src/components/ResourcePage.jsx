@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { cn } from '@/lib/utils'
 import ChildList from '@/components/ChildList'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,7 +18,7 @@ const NONE = '__none__'
 const ALL = '__all__'
 
 export default function ResourcePage({ resource }) {
-  const { label, singular, fields, filter } = resource
+  const { label, singular, fields, filter, readOnly } = resource
   const tableFields = fields.filter((f) => !f.createOnly)
 
   const [rows, setRows] = useState([])
@@ -78,9 +79,11 @@ export default function ResourcePage({ resource }) {
     <div className="mx-auto max-w-6xl">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{label}</h1>
-        <Button onClick={openNew}>
-          <Plus /> Ajouter
-        </Button>
+        {!readOnly && (
+          <Button onClick={openNew}>
+            <Plus /> Ajouter
+          </Button>
+        )}
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -118,8 +121,8 @@ export default function ResourcePage({ resource }) {
             {visibleRows.map((row) => (
               <TableRow
                 key={row.id}
-                onClick={() => setEditing(row)}
-                className={row.active === false ? 'cursor-pointer text-muted-foreground' : 'cursor-pointer'}
+                onClick={readOnly ? undefined : () => setEditing(row)}
+                className={cn(!readOnly && 'cursor-pointer', row.active === false && 'text-muted-foreground')}
               >
                 {tableFields.map((f) => (
                   <TableCell key={f.key}>

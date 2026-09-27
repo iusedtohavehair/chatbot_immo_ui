@@ -3,19 +3,19 @@ import { LogOut } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { resources } from '@/pages/resources'
 
-export default function Layout({ email }) {
+// items: [{ to, label, icon }]
+export default function Layout({ title, items, email }) {
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="flex shrink-0 flex-col border-b bg-muted/40 p-3 md:w-60 md:border-r md:border-b-0">
-        <div className="px-3 py-2 text-lg font-semibold">Admin</div>
+        <div className="px-3 py-2 text-lg font-semibold">{title}</div>
 
         <nav className="mt-2 flex gap-1 overflow-x-auto md:flex-col">
-          {resources.map(({ path, label, icon: Icon }) => (
+          {items.map(({ to, label, icon: Icon }) => (
             <NavLink
-              key={path}
-              to={`/${path}`}
+              key={to}
+              to={to}
               className={({ isActive }) =>
                 cn(
                   'flex items-center gap-2 rounded-lg px-3 py-2 text-sm whitespace-nowrap transition-colors hover:bg-accent',

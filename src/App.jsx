@@ -1,53 +1,46 @@
-import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
+import { useSession } from '@/lib/auth'
 import { Toaster } from '@/components/ui/sonner'
-import Layout from '@/components/Layout'
+import AdminGate from '@/components/AdminGate'
+import ConciergeGate from '@/components/ConciergeGate'
 import ResourcePage from '@/components/ResourcePage'
-import AccessDenied from '@/pages/AccessDenied'
 import Login from '@/pages/Login'
+import TicketsPage from '@/pages/TicketsPage'
+import { conciergeResources } from '@/pages/concierge'
 import { resources } from '@/pages/resources'
 
 export default function App() {
-  const [session, setSession] = useState(undefined)
-  const [adminCheck, setAdminCheck] = useState(null)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
-    return () => data.subscription.unsubscribe()
-  }, [])
-
-  const userId = session?.user.id
-  useEffect(() => {
-    if (!userId) return
-    supabase.rpc('is_admin').then(({ data }) => setAdminCheck({ userId, value: data === true }))
-  }, [userId])
-  const isAdmin = adminCheck && adminCheck.userId === userId ? adminCheck.value : undefined
-
-  let content
-  if (session === undefined) content = null
-  else if (!session) content = <Login />
-  else if (isAdmin === undefined) content = null
-  else if (!isAdmin) content = <AccessDenied email={session.user.email} />
-  else
-    content = (
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Layout email={session.user.email} />}>
-            {resources.map((r) => (
-              <Route key={r.path} path={r.path} element={<ResourcePage key={r.path} resource={r} />} />
-            ))}
-            <Route path="*" element={<Navigate to={resources[0].path} replace />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    )
+  const session = useSession()
+  if (session === undefined) return null
 
   return (
-    <>
-      {content}
+    <BrowserRouter>
+      <Routes>
+        {/* Administration */}
+        <Route
+          path="/admin/login"
+          element={session ? <Navigate to="/admin" replace /> : <Login title="Administration" />}
+        />
+        <Route path="/admin" element={<AdminGate session={session} />}>
+          <Route index element={<Navigate to={resources[0].path} replace />} />
+          {resources.map((r) => (
+            <Route key={r.path} path={r.path} element={<ResourcePage key={r.path} resource={r} />} />
+          ))}
+          <Route path="*" element={<Navigate to="/admin" replace />} />
+        </Route>
+
+        {/* Concierges */}
+        <Route path="/login" element={session ? <Navigate to="/" replace /> : <Login title="Espace concierge" />} />
+        <Route path="/" element={<ConciergeGate session={session} />}>
+          <Route index element={<Navigate to="tickets" replace />} />
+          <Route path="tickets" element={<TicketsPage />} />
+          {conciergeResources.map((r) => (
+            <Route key={r.path} path={r.path} element={<ResourcePage key={r.path} resource={r} />} />
+          ))}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
       <Toaster position="bottom-right" />
-    </>
+    </BrowserRouter>
   )
 }
