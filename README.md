@@ -23,14 +23,24 @@ Utiliser la clé **publishable** (Settings > API Keys). Ne jamais mettre la clé
 
 Dans Supabase > SQL Editor, exécuter dans l'ordre :
 
-1. `supabase/schema.sql` : crée les tables (si elles n'existent pas).
-2. `supabase/policies.sql` : active la sécurité (seuls les utilisateurs connectés ont accès).
-3. `supabase/migration_fk.sql` : optionnel, ajoute les clés étrangères.
+1. Créer le premier compte admin : Authentication > Users > **Add user** (courriel + mot de passe, cocher "Auto confirm").
+2. `supabase/schema.sql` : crée les tables (si elles n'existent pas).
+3. `supabase/users.sql` : table des utilisateurs + rôles. Les comptes Auth existants deviennent admins.
+4. `supabase/policies.sql` : active la sécurité (seuls les admins ont accès aux données).
+5. `supabase/migration_fk.sql` : optionnel, ajoute les clés étrangères.
 
-## Créer un compte admin
+Puis déployer l'Edge Function qui crée les comptes (page Utilisateurs) :
 
-Supabase > Authentication > Users > **Add user** (courriel + mot de passe, cocher "Auto confirm").
-Il n'y a pas d'inscription publique.
+- Edge Functions > **Deploy a new function** > Via Editor.
+- Nom : `create-user`. Coller le contenu de `supabase/functions/create-user/index.ts`.
+- Désactiver **Enforce JWT verification** (la fonction vérifie elle-même que l'appelant est admin).
+
+## Utilisateurs
+
+Page **Utilisateurs** : admins et concierges. Les nouveaux comptes sont créés depuis l'interface
+(il n'y a pas d'inscription publique). Seuls les comptes avec le rôle `admin` peuvent ouvrir cette interface.
+Désactiver un admin (switch "Actif") lui retire l'accès à cette interface. Pour les concierges,
+la future plateforme de tickets devra aussi vérifier `active`.
 
 ## Ajouter un champ ou une table
 
@@ -46,10 +56,13 @@ Tout est dans `src/pages/resources.js`. Ajouter un champ = ajouter une ligne :
 ```
 src/
   lib/supabase.js            client Supabase
+  lib/users.js               création d'utilisateur (appelle l'Edge Function)
   pages/resources.js         configuration des tables
   pages/Login.jsx            connexion
+  pages/AccessDenied.jsx     compte connecté mais non admin
   components/Layout.jsx      barre latérale
   components/ResourcePage.jsx  page générique (tableau + formulaire)
   components/ui/             composants shadcn
 supabase/                    scripts SQL
+supabase/functions/create-user/  Edge Function (création des comptes)
 ```

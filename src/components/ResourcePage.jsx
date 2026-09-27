@@ -11,12 +11,13 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
-// Radix Select n'accepte pas '' comme valeur.
+// Radix Select n'accepte pas '' comme valeur d'option.
 const NONE = '__none__'
 const ALL = '__all__'
 
 export default function ResourcePage({ resource }) {
   const { label, singular, fields, filter } = resource
+  const tableFields = fields.filter((f) => !f.createOnly)
 
   const [rows, setRows] = useState([])
   const [refs, setRefs] = useState({})
@@ -28,7 +29,7 @@ export default function ResourcePage({ resource }) {
   const load = useCallback(async () => {
     const refFields = resource.fields.filter((f) => f.ref)
     const [main, ...refResults] = await Promise.all([
-      supabase.from(resource.table).select('*').order('id', { ascending: false }),
+      supabase.from(resource.table).select('*').order('created_at', { ascending: false }),
       ...refFields.map((f) => supabase.from(f.ref).select('id, name, active').order('name')),
     ])
     if (main.error) toast.error(main.error.message)
@@ -41,18 +42,18 @@ export default function ResourcePage({ resource }) {
     load()
   }, [load])
 
-  const refName = useCallback(
-    (field, value) => {
+  const displayValue = useCallback(
+    (field, row) => {
+      const value = row[field.key]
       if (value == null || value === '') return ''
-      const item = refs[field.ref]?.find((r) => String(r.id) === String(value))
-      return item?.name ?? `#${value}`
+      if (field.ref) {
+        const item = refs[field.ref]?.find((r) => String(r.id) === String(value))
+        return item?.name ?? `#${value}`
+      }
+      if (field.options) return field.options.find((o) => o.value === value)?.label ?? value
+      return value
     },
     [refs],
-  )
-
-  const displayValue = useCallback(
-    (field, row) => (field.ref ? refName(field, row[field.key]) : row[field.key] ?? ''),
-    [refName],
   )
 
   const visibleRows = useMemo(() => {
@@ -67,7 +68,7 @@ export default function ResourcePage({ resource }) {
   const filterField = fields.find((f) => f.key === filter)
 
   function openNew() {
-    const blank = Object.fromEntries(fields.map((f) => [f.key, f.type === 'boolean' ? true : '']))
+    const blank = Object.fromEntries(fields.map((f) => [f.key, f.default ?? (f.type === 'boolean' ? true : '')]))
     if (filter && filterValue !== ALL) blank[filter] = filterValue
     setEditing(blank)
   }
@@ -107,7 +108,7 @@ export default function ResourcePage({ resource }) {
         <Table>
           <TableHeader>
             <TableRow>
-              {fields.map((f) => (
+              {tableFields.map((f) => (
                 <TableHead key={f.key}>{f.label}</TableHead>
               ))}
             </TableRow>
@@ -119,7 +120,7 @@ export default function ResourcePage({ resource }) {
                 onClick={() => setEditing(row)}
                 className={row.active === false ? 'cursor-pointer text-muted-foreground' : 'cursor-pointer'}
               >
-                {fields.map((f) => (
+                {tableFields.map((f) => (
                   <TableCell key={f.key}>
                     {f.type === 'boolean' ? (
                       <Badge variant={row[f.key] ? 'secondary' : 'outline'}>{row[f.key] ? 'Oui' : 'Non'}</Badge>
@@ -132,7 +133,7 @@ export default function ResourcePage({ resource }) {
             ))}
             {!loading && visibleRows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={fields.length} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={tableFields.length} className="py-10 text-center text-muted-foreground">
                   Aucun résultat
                 </TableCell>
               </TableRow>
@@ -161,6 +162,8 @@ export default function ResourcePage({ resource }) {
 function EditDialog({ record, resource, refs, onClose, onSaved, title }) {
   const [form, setForm] = useState(record)
   const [saving, setSaving] = useState(false)
+  const isNew = !record.id
+  const formFields = resource.fields.filter((f) => isNew || !f.createOnly)
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }))
 
@@ -168,16 +171,19 @@ function EditDialog({ record, resource, refs, onClose, onSaved, title }) {
     e.preventDefault()
     setSaving(true)
     const payload = Object.fromEntries(
-      resource.fields.map((f) => {
-        const v = form[f.key]
-        if (f.type === 'boolean') return [f.key, !!v]
-        return [f.key, v === '' || v == null ? null : String(v).trim()]
-      }),
+      formFields
+        .filter((f) => isNew || !f.lockOnEdit)
+        .map((f) => {
+          const v = form[f.key]
+          if (f.type === 'boolean') return [f.key, !!v]
+          if (v === '' || v == null) return [f.key, null]
+          return [f.key, f.type === 'password' ? String(v) : String(v).trim()]
+        }),
     )
-    const query = record.id
-      ? supabase.from(resource.table).update(payload).eq('id', record.id)
-      : supabase.from(resource.table).insert(payload)
-    const { error } = await query
+    let error
+    if (!isNew) ({ error } = await supabase.from(resource.table).update(payload).eq('id', record.id))
+    else if (resource.create) ({ error } = await resource.create(payload))
+    else ({ error } = await supabase.from(resource.table).insert(payload))
     setSaving(false)
     if (error) return toast.error(error.message)
     toast.success('Enregistré')
@@ -191,8 +197,15 @@ function EditDialog({ record, resource, refs, onClose, onSaved, title }) {
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
-          {resource.fields.map((f) => (
-            <Field key={f.key} field={f} value={form[f.key]} options={refs[f.ref]} onChange={(v) => set(f.key, v)} />
+          {formFields.map((f) => (
+            <Field
+              key={f.key}
+              field={f}
+              value={form[f.key]}
+              refOptions={refs[f.ref]}
+              disabled={!isNew && f.lockOnEdit}
+              onChange={(v) => set(f.key, v)}
+            />
           ))}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
@@ -208,35 +221,41 @@ function EditDialog({ record, resource, refs, onClose, onSaved, title }) {
   )
 }
 
-function Field({ field, value, options, onChange }) {
+function Field({ field, value, refOptions, disabled, onChange }) {
   const id = `field-${field.key}`
 
   if (field.type === 'boolean') {
     return (
       <div className="flex items-center justify-between">
         <Label htmlFor={id}>{field.label}</Label>
-        <Switch id={id} checked={!!value} onCheckedChange={onChange} />
+        <Switch id={id} checked={!!value} onCheckedChange={onChange} disabled={disabled} />
       </div>
     )
   }
 
-  if (field.ref) {
+  if (field.ref || field.options) {
+    const items = field.ref
+      ? [
+          { value: NONE, label: 'Aucun' },
+          ...(refOptions ?? []).map((o) => ({
+            value: String(o.id),
+            label: `${o.name || `#${o.id}`}${o.active === false ? ' (inactif)' : ''}`,
+          })),
+        ]
+      : field.options
+    const current = value == null || value === '' ? (field.ref ? NONE : '') : String(value)
+
     return (
       <div className="grid gap-2">
         <Label>{field.label}</Label>
-        <Select
-          value={value == null || value === '' ? NONE : String(value)}
-          onValueChange={(v) => onChange(v === NONE ? '' : v)}
-        >
+        <Select value={current} onValueChange={(v) => onChange(v === NONE ? '' : v)} disabled={disabled}>
           <SelectTrigger className="w-full">
-            <SelectValue />
+            <SelectValue placeholder="Choisir..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE}>Aucun</SelectItem>
-            {(options ?? []).map((o) => (
-              <SelectItem key={o.id} value={String(o.id)}>
-                {o.name || `#${o.id}`}
-                {o.active === false && ' (inactif)'}
+            {items.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -248,7 +267,15 @@ function Field({ field, value, options, onChange }) {
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>{field.label}</Label>
-      <Input id={id} type={field.type ?? 'text'} value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+      <Input
+        id={id}
+        type={field.type ?? 'text'}
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        required={field.required}
+        minLength={field.type === 'password' ? 6 : undefined}
+        disabled={disabled}
+      />
     </div>
   )
 }

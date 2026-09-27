@@ -1,8 +1,18 @@
-import { Briefcase, Building2, DoorOpen, Users } from 'lucide-react'
+import { Briefcase, Building2, DoorOpen, UserCog, Users } from 'lucide-react'
+import { createUser } from '@/lib/users'
 
 // Chaque entrée décrit une table Supabase et génère automatiquement sa page.
-// Champ: { key, label, type?: 'text' | 'email' | 'tel' | 'boolean', ref?: <table liée> }
+// Champ: {
+//   key, label,
+//   type?: 'text' | 'email' | 'tel' | 'password' | 'boolean',
+//   ref?: <table liée>            -> liste déroulante vers une autre table
+//   options?: [{ value, label }]  -> liste déroulante à choix fixes
+//   default?, required?,
+//   createOnly?                   -> seulement à la création, jamais affiché ni modifié ensuite
+//   lockOnEdit?                   -> non modifiable après la création
+// }
 // `filter` = clé d'un champ `ref` proposé comme filtre en haut de la page.
+// `create` = fonction de création personnalisée (sinon insert direct dans la table).
 export const resources = [
   {
     path: 'proprietaires',
@@ -55,6 +65,31 @@ export const resources = [
       { key: 'name', label: 'Nom' },
       { key: 'phone', label: 'Téléphone', type: 'tel' },
       { key: 'email', label: 'Courriel', type: 'email' },
+      { key: 'active', label: 'Actif', type: 'boolean' },
+    ],
+  },
+  {
+    path: 'utilisateurs',
+    table: 'users',
+    label: 'Utilisateurs',
+    singular: 'utilisateur',
+    icon: UserCog,
+    filter: 'landlord',
+    create: createUser,
+    fields: [
+      { key: 'name', label: 'Nom' },
+      { key: 'email', label: 'Courriel', type: 'email', required: true, lockOnEdit: true },
+      { key: 'password', label: 'Mot de passe', type: 'password', required: true, createOnly: true },
+      {
+        key: 'role',
+        label: 'Rôle',
+        default: 'concierge',
+        options: [
+          { value: 'concierge', label: 'Concierge' },
+          { value: 'admin', label: 'Admin' },
+        ],
+      },
+      { key: 'landlord', label: 'Propriétaire', ref: 'landlord' },
       { key: 'active', label: 'Actif', type: 'boolean' },
     ],
   },
