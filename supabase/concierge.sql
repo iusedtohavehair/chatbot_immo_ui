@@ -4,7 +4,7 @@
 
 alter table public.tickets add column if not exists tenant bigint references public.tenants (id);
 alter table public.tickets alter column owner set default auth.uid()::text;
-alter table public.tickets alter column priority set default 2;
+alter table public.tickets alter column priority set default 3;
 alter table public.tickets alter column state set default 0;
 
 create or replace function public.my_door_ids()

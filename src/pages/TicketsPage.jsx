@@ -4,14 +4,21 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { myScope } from '@/lib/scope'
-import { CATEGORIES, PRIORITIES, RESOLVED, STATES, findOption } from '@/lib/tickets'
+import { CATEGORIES, DEFAULT_PRIORITY, PRIORITIES, RESOLVED, STATES, findOption } from '@/lib/tickets'
 import TicketComments from '@/components/TicketComments'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
@@ -20,6 +27,9 @@ const OPEN = '__open__'
 const NONE = '__none__'
 
 const byId = (list) => Object.fromEntries(list.map((x) => [String(x.id), x]))
+
+const formatDateTime = (value) =>
+  new Date(value).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' })
 
 export default function TicketsPage() {
   const [data, setData] = useState({ tickets: [], doors: [], buildings: [], tenants: [] })
@@ -97,7 +107,7 @@ export default function TicketsPage() {
 
   function openNew() {
     setEditing({
-      priority: 2,
+      priority: DEFAULT_PRIORITY,
       state: 0,
       building: buildingFilter !== ALL ? buildingFilter : '',
     })
@@ -184,9 +194,7 @@ export default function TicketsPage() {
                 <TableCell>
                   <OptionBadge option={findOption(STATES, ticket.state)} />
                 </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {new Date(ticket.created_at).toLocaleDateString('fr-CA')}
-                </TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(ticket.created_at)}</TableCell>
               </TableRow>
             ))}
             {!loading && visibleRows.length === 0 && (
@@ -230,7 +238,7 @@ function TicketDialog({ ticket, data, onClose, onSaved }) {
     summary: ticket.summary ?? '',
     text: ticket.text ?? '',
     category: ticket.category ?? '',
-    priority: String(ticket.priority ?? 2),
+    priority: String(ticket.priority ?? DEFAULT_PRIORITY),
     state: String(ticket.state ?? 0),
   }))
   const [saving, setSaving] = useState(false)
@@ -290,6 +298,7 @@ function TicketDialog({ ticket, data, onClose, onSaved }) {
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isNew ? 'Nouveau ticket' : `Ticket #${ticket.id}`}</DialogTitle>
+          {!isNew && <DialogDescription>Créé le {formatDateTime(ticket.created_at)}</DialogDescription>}
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid gap-2">

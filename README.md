@@ -58,7 +58,7 @@ Page **Utilisateurs** (admin) : admins et concierges. Les comptes sont créés d
 
 ## Tickets
 
-- Priorité (`priority`) : 1 Basse, 2 Normale, 3 Haute, 4 Urgente.
+- Priorité (`priority`) : 1 Urgent, 2 Élevé, 3 Normal, 4 Basse.
 - État (`state`) : 0 Nouveau, 1 En cours, 2 En attente, 3 Résolu.
 - `title` = titre court (obligatoire). `summary` = résumé libre. `text` = description détaillée.
 - `owner` = id de l'utilisateur qui a créé le ticket (rempli automatiquement).
